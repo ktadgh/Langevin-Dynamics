@@ -140,6 +140,53 @@ def make_obabo(force):
         return q , p
     return obabo_step
 
+def make_baoab(force):
+    @njit(parallel=True)
+    def A_step( qp , h , factor=1):
+        q,p = qp
+
+        q = q + h*p*factor
+
+        return [q,p]
+
+    @njit(parallel=True)
+    def B_step( qp , h, factor=1):
+        q,p = qp
+
+        F = force(q)
+
+        p = p + h*F*factor
+
+        return [q,p]
+
+
+    @njit()
+    def O_step( qp , h,gamma, factor=1):
+        q,p = qp
+
+        alpha = np.exp(-h*gamma)
+
+        R = np.random.randn( q.size ).reshape( q.shape)
+        p = np.exp(- gamma*h *factor)*p+ np.sqrt(1-np.exp(-gamma*h*factor*2))*R
+
+        return [q,p]
+
+    @njit()
+    def baoab_step(q,p,h,gamma):
+        qp = [q,p]  #this just translates the separate q and p vectors
+                    #into a single vector composed from the pair.
+        qp = B_step( qp, h,0.5)
+        qp = A_step(qp , h , 0.5)
+        qp = O_step( qp, h, gamma, 1)
+        qp = A_step( qp, h,0.5)
+        qp = B_step( qp, h, gamma,  0.5)
+
+        q,p = qp
+        return q , p
+    return baoab_step
+
+
+
 def make_simulation(step_function):
     @njit()
     def run_simulation(Nsteps, h, gamma,q_init= np.array([]),p_init= np.array([])):
@@ -169,7 +216,7 @@ def make_numba_convergence(step_function):
         p = np.copy(p_init)
         t = 0
 
-        while np.any(not_converged) and its < 250000:
+        while np.any(not_converged) and its < 100000:
             its +=1
             q,p = step_function(q, p, h, gamma)
             totals += function(q)
@@ -181,12 +228,12 @@ def make_numba_convergence(step_function):
 
 def make_simulate_trajectories(step_function, run_simulation):
     @njit()
-    def simulate_trajectories(n_steps, stepsize, gammas, q_init = np.array([]), p_init = np.array([])):
+    def simulate_trajectories(n_steps, stepsize, gamms, q_init = np.array([]), p_init = np.array([])):
         trajectories = []
-        for gamma in gammas:
-            q_traj = run_simulation(n_steps , stepsize, gamma,q_init, p_init)
+        for gamm in gamms:
+            q_traj = run_simulation(n_steps , stepsize, gamm,q_init, p_init)
             trajectories.append(q_traj)
-        return gammas, trajectories
+        return gamms, trajectories
     return simulate_trajectories
 
 

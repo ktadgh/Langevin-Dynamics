@@ -179,7 +179,8 @@ def make_baoab(force):
         qp = A_step(qp , h , 0.5)
         qp = O_step( qp, h, gamma, 1)
         qp = A_step( qp, h,0.5)
-        qp = B_step( qp, h, gamma,  0.5)
+        qp = B_step( qp, h,  0.5)
+
 
         q,p = qp
         return q , p

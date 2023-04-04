@@ -261,7 +261,7 @@ def make_numba_average_convergence(step_function):
         q = np.copy(q_init)
         p = np.copy(p_init)
 
-        while not_converged and f_its < 1000000:
+        while not_converged and f_its < 100000:
             its +=1
             #print(q)
             q,p = step_function(q, p, h, gamma)

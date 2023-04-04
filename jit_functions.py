@@ -11,6 +11,7 @@ class Scheme:
         self.force = force
         self.potential = potential
         self.run_numba_convergence = make_numba_convergence(self.step_function)
+        self.run_numba_average_convergence = make_numba_average_convergence(self.step_function)
         self.run_simulation = make_simulation(self.step_function)
         self.simulate_trajectories = make_simulate_trajectories(self.step_function, self.run_simulation)
 
@@ -41,6 +42,7 @@ class Scheme:
             p_init = np.zeros(sims)
         gammas, trajectories = self.simulate_trajectories(n_steps, stepsize, gammas, q_init, p_init)
         fig = plt.figure(figsize=[10,7])
+
         for i in range(len(trajectories)):
             q_traj= trajectories[i]
             histogram,bins = np.histogram(q_traj,bins=50,range=[-3,3], density=True)
@@ -48,6 +50,7 @@ class Scheme:
             plt.plot(midx,histogram,label=f'Friction = {gammas[i]}')
             plt.xlabel('$q$')
             plt.ylabel('Density')
+
 
 
         plt.title("Distribution of $q$ for different values of friction")
@@ -89,11 +92,29 @@ class Scheme:
         for gamma in gammas:
             print(f"Gamma = {gamma}")
             iters = self.run_numba_convergence(error, function,value, h, gamma,q_init,p_init)
+            print(f"Iters = {iters}")
             its1.append(iters)
         plt.plot(gammas, its1)
         plt.xlabel('gamma')
         plt.ylabel('iterations to convergence')
         plt.xscale('log')
+
+    def avg_convergence_time_graph(self,title,error, function,value, h, gammas,q_init,p_init):
+        its1 = []
+        for gamma in gammas:
+            print(f"Gamma = {gamma}")
+            iters = self.run_numba_average_convergence(error, function,value, h, gamma,q_init,p_init)
+            print(f"Iters = {iters}")
+            its1.append(iters)
+        iters1 = np.array(its1)
+        np.save('iterations',iters1)
+        plt.plot(gammas, its1)
+        plt.title(title)
+        plt.savefig(title+ ".pdf", bbox_inches = 'tight')
+        plt.xlabel('gamma')
+        plt.ylabel('iterations to convergence')
+        plt.xscale('log')
+
 
 def make_obabo(force):
     @njit(parallel=True)
@@ -211,21 +232,46 @@ def make_numba_convergence(step_function):
     def run_numba_convergence(error, function,value, h, gamma,q_init= np.array([]),p_init= np.array([])):
         mean = 0
         its = 0
+        f_its = 0
         totals = is_converged  = np.zeros_like(q_init)
         not_converged = q_means = np.ones_like(q_init)
         q = np.copy(q_init)
         p = np.copy(p_init)
         t = 0
 
-        while np.any(not_converged) and its < 100000:
+        while np.any(not_converged) and its < 200000:
             its +=1
             q,p = step_function(q, p, h, gamma)
-            totals += function(q)
+            if its > 10000:
+                totals += function(q)
+                f_its +=1
             not_converged = (np.abs(totals/its -value) > error).astype(np.float64)
 
 
-        return its
+        return f_its
     return run_numba_convergence
+
+def make_numba_average_convergence(step_function):
+    @njit()
+    def run_numba_average_convergence(error, function,value, h, gamma,q_init= np.array([]),p_init= np.array([])):
+        its = f_its = 0
+        totals = np.zeros_like(q_init)
+        means = np.ones_like(q_init)*100
+        not_converged = True
+        q = np.copy(q_init)
+        p = np.copy(p_init)
+
+        while not_converged and f_its < 1000000:
+            its +=1
+            #print(q)
+            q,p = step_function(q, p, h, gamma)
+            if its > 10000:
+                f_its += 1
+                totals += function(q)
+                means = totals / f_its
+            not_converged = (np.abs(means -value)).mean() > error
+        return its
+    return run_numba_average_convergence
 
 def make_simulate_trajectories(step_function, run_simulation):
     @njit()

@@ -91,7 +91,10 @@ class Scheme:
         its1 = []
         for gamma in gammas:
             print(f"Gamma = {gamma}")
+            start_time = time.time()
             iters = self.run_numba_convergence(error, function,value, h, gamma,q_init,p_init)
+            end_time = time.time()
+            print(f"Time Elapsed: {end_time - start_time}")
             print(f"Iters = {iters}")
             its1.append(iters)
         plt.plot(gammas, its1)
@@ -103,13 +106,16 @@ class Scheme:
         its1 = []
         for gamma in gammas:
             print(f"Gamma = {gamma}")
+            start_time = time.time()
             iters = self.run_numba_average_convergence(error, function,value, h, gamma,q_init,p_init)
+            end_time = time.time()
+            print(f"Time Elapsed: {end_time - start_time}")
             print(f"Iters = {iters}")
             its1.append(iters)
         iters1 = np.array(its1)
-        np.save('iterations',iters1)
+        np.save('iterations'+title,iters1)
         plt.plot(gammas, its1)
-        plt.title(title)
+        plt.title('Convergence time graph')
         plt.savefig(title+ ".pdf", bbox_inches = 'tight')
         plt.xlabel('gamma')
         plt.ylabel('iterations to convergence')
@@ -239,7 +245,7 @@ def make_numba_convergence(step_function):
         p = np.copy(p_init)
         t = 0
 
-        while np.any(not_converged) and its < 200000:
+        while np.any(not_converged) and its < 1000000:
             its +=1
             q,p = step_function(q, p, h, gamma)
             if its > 10000:
@@ -261,7 +267,7 @@ def make_numba_average_convergence(step_function):
         q = np.copy(q_init)
         p = np.copy(p_init)
 
-        while not_converged and f_its < 100000:
+        while not_converged and f_its < 1000000:
             its +=1
             #print(q)
             q,p = step_function(q, p, h, gamma)
@@ -270,6 +276,7 @@ def make_numba_average_convergence(step_function):
                 totals += function(q)
                 means = totals / f_its
             not_converged = (np.abs(means -value)).mean() > error
+
         return its
     return run_numba_average_convergence
 
